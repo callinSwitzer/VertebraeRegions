@@ -158,11 +158,12 @@ for(kk in 1:length(Onebp)){
 colnames(erDF) <- c("breakpt","meanAbsErr")
 erDF 
 
+# visualize mean absolute error
 plot(erDF)
 
 
 ## DO THE SAME FOR ALL INSTANCES OF TWO BREAKPOINTS
-erDF <- matrix(ncol = 3, nrow = 0)
+erDF2 <- matrix(ncol = 3, nrow = 0)
 for(kk in 1:nrow(twobp)){
      cvError <- numeric()
      for(ii in 1:10){
@@ -174,14 +175,31 @@ for(kk in 1:nrow(twobp)){
           else cvError[ii] <- NA
      }
      
-     erDF <- rbind(erDF, c( twobp[kk,], round(mean(cvError, na.rm = TRUE), 4)))
+     erDF2 <- rbind(erDF2, c( twobp[kk,], round(mean(cvError, na.rm = TRUE), 4)))
 }
-colnames(erDF) <- c("breakpt1", "breakpt2","meanAbsErr")
-erDF 
+colnames(erDF2) <- c("breakpt1", "breakpt2","meanAbsErr")
+erDF2 <- data.frame(erDF2)
+
+# interactive 3D visualization
+plot3d(erDF2, type = 'p')
 
 
-plot3d(erDF)
+# make a wireframe for 3D visualization
+s = interp(unlist(erDF2$breakpt1), unlist(erDF2$breakpt2), unlist(erDF2$meanAbsErr))
+with(s,wireframe(z,row.values=x,col.values=y, 
+                 main = "Surface elevation data",
+                 drape = TRUE,
+                 colorkey = TRUE,
+                 screen = list(z = 80, x = -80)))
 
+
+# find min values
+erDF[erDF$meanAbsErr == min(erDF$meanAbsErr),]
+erDF2 <- as.data.frame(apply(erDF2, 2, unlist)) # break at 10
+erDF2[erDF2$meanAbsErr == min(erDF2$meanAbsErr),] # breaks at 5 and 11
+
+
+# pick up here with four regions
 
 
 
