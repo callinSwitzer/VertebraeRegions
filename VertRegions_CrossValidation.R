@@ -9,7 +9,7 @@ ipak <- function(pkg){
      sapply(pkg, require, character.only = TRUE)
 }
 
-packages <- c( "ggplot2", "reshape2", "MASS", "rms", "viridis")
+packages <- c( "ggplot2", "reshape2", "MASS", "rms", "viridis", "rgl")
 ipak(packages)
 
 
@@ -57,7 +57,9 @@ threeBreak <- function(breakpoints = c(6, 11)){
 
 # generate random cross-validation groups for each of the vertebrae
 alligator <- cbind(alligator,  rep(sample(1:10), length= 22))
+
 colnames(alligator)[ncol(alligator)] <- "cvGroup"
+# alligator[, "cvGroup"] <- sample(alligator[, "cvGroup"]) # reshuffle cvGroup
 
 RegressionWBreaks <- function(breakpoints = c(6, 15), animal = alligator, cvGp = 1){
      # compute pca
@@ -97,35 +99,39 @@ RegressionWBreaks <- function(breakpoints = c(6, 15), animal = alligator, cvGp =
           else{
                stop("ERROR")
           }
-          mod[[ii]] <- lm(pc1 ~ vertNum, data = d2)
+          
+          OK <- tryCatch({mod[[ii]] <- lm(pc1 ~ vertNum, data = d2)
           predVals <- predict(mod[[ii]], newdata = data.frame(vertNum = dataset_full[rownames(d2),1]))
           lines(y = predVals, x = dataset_full[rownames(d2),1], col = cols[ii], lwd = 5)
-          predictedVals <- c(predictedVals, predVals) # get predicted values
+          predictedVals <- c(predictedVals, predVals) # get predicted values, but will give 
+          # a warning if there is only one vertebra in a group -- rank deficient.
+          }, 
+          error = function(e) NA)
+          if(is.na(OK[1])) return(NA)
      }
      # get out of sample errors
-     newDF <- data.frame(predv =  predictedVals, dataset_full)
-     outOfsamp_preds <- newDF[newDF$cvGp == cvGp, ]
-     ers <- with(outOfsamp_preds, pc1 - predv )
-     # plot out-of-sample errors
-     segments(x0 = outOfsamp_preds$vertNum, y0 = outOfsamp_preds$pc1, x1 = outOfsamp_preds$vertNum,
-              y1 = outOfsamp_preds$predv, lwd = 3, col= 'grey')
-     abline(v = dataset_full$vertNum[breakpoints] + 0.5)
-     
-     return(list(outOfsampleVertNums = outOfsamp_preds$vertNum, predictionErrors = ers, mean_abs_err = mean(abs(ers)), numBreaks= length(breakpoints), bkpts = breakpoints, crossValGroup = cvGp))
-     
+     if(length(predictedVals) > nrow(dataset_full)){
+          print("trying to make a break outside of range of vertebrae")
+          return(NA)
+     }
+     else{
+          newDF <- data.frame(predv =  predictedVals, dataset_full)
+          outOfsamp_preds <- newDF[newDF$cvGp == cvGp, ]
+          ers <- with(outOfsamp_preds, pc1 - predv )
+          # plot out-of-sample errors
+          segments(x0 = outOfsamp_preds$vertNum, y0 = outOfsamp_preds$pc1, x1 = outOfsamp_preds$vertNum,
+                   y1 = outOfsamp_preds$predv, lwd = 3, col= 'grey')
+          abline(v = dataset_full$vertNum[breakpoints] + 0.5)
+          
+          return(list(outOfsampleVertNums = outOfsamp_preds$vertNum, 
+                      predictionErrors = ers, mean_abs_err = mean(abs(ers)), 
+                      numBreaks= length(breakpoints), bkpts = breakpoints, crossValGroup = cvGp))
+          }
 }
 
 
-RegressionWBreaks(breakpoints = c(6, 12), animal = alligator, cvGp = 1)
+RegressionWBreaks(breakpoints = c(6, 21), animal = alligator, cvGp = 4)
 nrow(mus)
-
-
-for(ii in 1:10){
-     png(paste("~/Desktop/testStack/", formatC(ii, width = 4, flag = 0), ".png", sep = ""))
-     aa <- RegressionWBreaks(breakpoints = c(6, 12), animal = alligator, cvGp = ii)
-     dev.off()
-     print(aa$mean_abs_err)
-}
 
 
 
@@ -142,6 +148,52 @@ threebp <- data.frame(bp1 = rep(1:nrow(animal), each = nrow(animal)^2),
                       bp3 = 1:nrow(animal))
 
 threebp <- threebp[threebp[,1] < threebp[, 2] & threebp[,2] < threebp[,3], ]
+
+
+# LOOK AT ALL INSTANCES OF A SINGLE BREAKPOINT
+erDF <- data.frame()
+for(kk in 1:length(Onebp)){
+     cvError <- numeric()
+     for(ii in 1:10){
+          png(paste("~/Desktop/testStack/", formatC(as.numeric(paste0(kk, ii)), width = 4, flag = 0), ".png", sep = ""))
+          aa <- RegressionWBreaks(breakpoints = Onebp[kk], animal = alligator, cvGp = ii)
+          dev.off()
+          if(!is.na(aa[1])) cvError[ii] <- aa$mean_abs_err
+          else cvError[ii] <- NA
+     }
+     
+    paste('error = ', round(mean(cvError, na.rm = TRUE), 4), "breakpt = ", Onebp[kk])
+    erDF <- rbind(erDF, c( Onebp[kk], round(mean(cvError, na.rm = TRUE), 4)))
+}
+colnames(erDF) <- c("breakpt","meanAbsErr")
+erDF 
+
+plot(erDF)
+
+
+## DO THE SAME FOR ALL INSTANCES OF TWO BREAKPOINTS
+erDF <- matrix(ncol = 3, nrow = 0)
+for(kk in 1:nrow(twobp)){
+     cvError <- numeric()
+     for(ii in 1:10){
+          png(paste("~/Desktop/testStack/", formatC(as.numeric(paste0(1, kk, ii)), width = 5, flag = 0), 
+                    ".png", sep = ""))
+          aa <- RegressionWBreaks(breakpoints = as.numeric(twobp[kk,]), animal = alligator, cvGp = ii)
+          dev.off()
+          if(!is.na(aa[1])) cvError[ii] <- aa$mean_abs_err
+          else cvError[ii] <- NA
+     }
+     
+     erDF <- rbind(erDF, c( twobp[kk,], round(mean(cvError, na.rm = TRUE), 4)))
+}
+colnames(erDF) <- c("breakpt1", "breakpt2","meanAbsErr")
+erDF 
+
+
+plot3d(erDF)
+
+
+
 
 rwb_vect <- Vectorize(RegressionWBreaks, vectorize.args = 'breakpoints')
 
