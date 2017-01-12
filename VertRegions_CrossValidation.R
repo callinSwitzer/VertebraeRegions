@@ -1,6 +1,7 @@
 ## Callin Switzer
 ## 16 Dec 2016
-## Vertebrae regions, using linear splines or "knots"
+## Update 12 Jan
+## Vertebrae regions, using linear splines
 
 #install packages
 ipak <- function(pkg){
@@ -16,6 +17,9 @@ ipak(packages)
 # load data
 load("/Users/callinswitzer/Dropbox/dataAnalysisForOthers/VertebrateMorphology_Katrina/alligator.rda")
 load("/Users/callinswitzer/Dropbox/dataAnalysisForOthers/VertebrateMorphology_Katrina/mus.rda")
+
+
+# initial data inspection
 alli <- as.data.frame(mus)
 
 
@@ -27,32 +31,16 @@ str(pcs)
 
 plot(alli[,1], pcs$x[,1])
 
-
+# compare hierarchical clustering method
 hcl.flow = hclust(dist(alli[, 2:ncol(alli)], method = 'euclidian'), method = 'ward.D')
 plot(hcl.flow)
 groups <- cutree(hcl.flow, k=2) # cut tree into k clusters
 
 
+# example of splines with that meet at the breakpoints
 plot(pcs$x[,1] ~ alli[,1])
 aa <- ols(pcs$x[,1]  ~ lsp(alli[,1], c(9, 14), x=TRUE))
 lines(predict(aa), x = alli[,1])
-
-threeBreak <- function(breakpoints = c(6, 11)){
-     # plot the pc1 vs. vertebrae number
-     plot(pcs$x[,1]  ~ alli[,1])
-     
-     # make the models for each of the three regions
-     m1 <- lm(pcs$x[1:breakpoints[1],1]  ~ alli[,1][1:breakpoints[1]])
-     lines(predict(m1), x = alli[,1][1:breakpoints[1]], col = 'red')
-     
-     m2 <- lm(pcs$x[(breakpoints[1] + 1):breakpoints[2],1]  ~ alli[,1][(breakpoints[1] + 1):breakpoints[2]])
-     lines(predict(m2), x = alli[,1][(breakpoints[1] + 1):breakpoints[2]], col = 'blue')
-     
-     m3 <- lm(pcs$x[(breakpoints[2] + 1):length(alli[,1]),1]  ~ alli[,1][(breakpoints[2] + 1):length(alli[,1])])
-     lines(predict(m3), x = alli[,1][(breakpoints[2] + 1):length(alli[,1])], col = 'green')
-     
-     
-}
 
 
 # generate random cross-validation groups for each of the vertebrae
@@ -61,6 +49,9 @@ alligator <- cbind(alligator,  rep(sample(1:10), length= 22))
 colnames(alligator)[ncol(alligator)] <- "cvGroup"
 # alligator[, "cvGroup"] <- sample(alligator[, "cvGroup"]) # reshuffle cvGroup
 
+
+
+# function for conducting regression with different breakpoints
 RegressionWBreaks <- function(breakpoints = c(6, 15), animal = alligator, cvGp = 1){
      # compute pca
      pcs <- prcomp(animal[, 2:ncol(animal)], center = TRUE, scale. = TRUE)
@@ -130,9 +121,8 @@ RegressionWBreaks <- function(breakpoints = c(6, 15), animal = alligator, cvGp =
 }
 
 
-RegressionWBreaks(breakpoints = c(6, 21), animal = alligator, cvGp = 4)
-nrow(mus)
-
+# example of using this function
+RegressionWBreaks(breakpoints = c(6, 15), animal = alligator, cvGp = 4)
 
 
 # generate all possible combinations of one two three breakpoints
