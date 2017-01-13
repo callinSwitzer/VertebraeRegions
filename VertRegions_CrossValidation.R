@@ -489,3 +489,101 @@ for(hh in list(one, two, three, four, five, six)){
 # best one so far:
 RegressionWBreaks(breakpoints = c(5, 11, 13, 17, 20), animal = alligator, cvGp =99)
 
+
+## example
+exDS <- dataset1
+exDS$pc1 <- rep(c(1:5, 6:1), each = 2)
+
+RegressionWBreaks_EX <- function(breakpoints = c(6, 15), animal = alligator, cvGp = 1, ylim = c(-5, 3)){
+     # compute pca
+     pcs <- prcomp(animal[, 2:(ncol(animal) -1)], center = TRUE, scale. = TRUE)
+     
+     dataset1 <- exDS
+     dataset_full <- dataset1
+     
+     # plot the pc1 vs. vertebrae number
+     plot(dataset1[, 1:2])
+     
+     # remove points to later calculate out-of-sample error
+     outOfSamplePoints <- data.frame(dataset1[dataset1$cvGp == cvGp,])
+     dataset1[dataset1$cvGp == cvGp,1:2] <- NA
+     
+     # color points that are being used for calculating lines
+     points(dataset1[, 1:2],col = 'grey40', pch = 20)
+     points(outOfSamplePoints[,1:2], pch = 5)
+     #legend("bottomright", legend = c("in sample", "out of sample"), pch = c(20, 5), col = c('grey40', 'black'))
+     
+     # define color pallette for lines
+     cols = viridis::inferno(n  = length(breakpoints) + 1, end = 0.8)
+     
+     # make an empty list for adding the models
+     mod <- list()
+     predictedVals <- numeric()
+     for(ii in 1:(length(breakpoints) + 1)){
+          if(ii == 1){
+               d2 <- dataset1[1:breakpoints[1], ]
+          }
+          else if(ii <= length(breakpoints)){
+               d2 <- dataset1[(breakpoints[ii - 1] + 1):breakpoints[ii], ]
+          }
+          else if(ii > length(breakpoints)){
+               d2 <- dataset1[(breakpoints[ii-1] + 1):length(animal[,1]),, ]
+          }
+          else{
+               stop("ERROR")
+          }
+          
+          OK <- tryCatch({mod[[ii]] <- lm(pc1 ~ vertNum, data = d2)
+          predVals <- predict(mod[[ii]], newdata = data.frame(vertNum = dataset_full[rownames(d2),1]))
+          lines(y = predVals, x = dataset_full[rownames(d2),1], col = cols[ii], lwd = 5)
+          predictedVals <- c(predictedVals, predVals) # get predicted values, but will give 
+          # a warning if there is only one vertebra in a group -- rank deficient.
+          }, 
+          error = function(e) NA)
+          if(is.na(OK[1])) return(NA)
+     }
+     # get out of sample errors
+     if(length(predictedVals) > nrow(dataset_full)){
+          print("trying to make a break outside of range of vertebrae")
+          return(NA)
+     }
+     else{
+          newDF <- data.frame(predv =  predictedVals, dataset_full)
+          outOfsamp_preds <- newDF[newDF$cvGp == cvGp, ]
+          ers <- with(outOfsamp_preds, pc1 - predv )
+          # plot out-of-sample errors
+          segments(x0 = outOfsamp_preds$vertNum, y0 = outOfsamp_preds$pc1, x1 = outOfsamp_preds$vertNum,
+                   y1 = outOfsamp_preds$predv, lwd = 3, col= 'grey')
+          abline(v = dataset_full$vertNum[breakpoints] + 0.5)
+          
+          return(list(outOfsampleVertNums = outOfsamp_preds$vertNum, 
+                      predictionErrors = ers, mean_abs_err = mean(abs(ers)), 
+                      numBreaks= length(breakpoints), bkpts = breakpoints, crossValGroup = cvGp))
+     }
+}
+
+par(mfrow =c(2,1))
+RegressionWBreaks_EX(breakpoints = c(2,4,6,8,10,12, 14, 16, 18, 20))
+mtext("superior model, according to CV")
+RegressionWBreaks_EX(breakpoints = c(11))
+mtext("inferior model")
+
+for(hh in list(c(2,4,6,8,10,12, 14, 16, 18, 20), 11)){
+     err <- numeric()
+     for(ll in 1:5){
+          
+          exDS$cvGp <- sample(exDS$cvGp) # reshuffle cvGroup
+          cvError <- numeric()
+          for(ii in 1:10){
+              
+               aa <- RegressionWBreaks_EX(breakpoints = hh, cvGp = ii)
+               
+               if(!is.na(aa[1])) cvError[ii] <- aa$mean_abs_err
+               else cvError[ii] <- NA
+          }  
+          err = c(err, round(mean(cvError, na.rm = TRUE), 4))
+          
+     }
+     print(paste(paste(hh, collapse = "_"), mean(err)))
+     
+}
