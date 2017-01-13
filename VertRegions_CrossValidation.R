@@ -488,4 +488,4 @@ for(hh in list(one, two, three, four, five, six)){
 
 # best one so far:
 RegressionWBreaks(breakpoints = c(5, 11, 13, 17, 20), animal = alligator, cvGp =99)
-mtext("alligator vert regions with 10-fold CV")
+
