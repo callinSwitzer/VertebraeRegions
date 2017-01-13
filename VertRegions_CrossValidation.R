@@ -60,6 +60,7 @@ colnames(mus)[ncol(mus)] <- "cvGroup"
 #############################################################################
 # function for conducting regression with different breakpoints
 #############################################################################
+
 RegressionWBreaks <- function(breakpoints = c(6, 15), animal = alligator, cvGp = 1, ylim = c(-5, 3)){
      # compute pca
      pcs <- prcomp(animal[, 2:(ncol(animal) -1)], center = TRUE, scale. = TRUE)
@@ -77,7 +78,7 @@ RegressionWBreaks <- function(breakpoints = c(6, 15), animal = alligator, cvGp =
      # color points that are being used for calculating lines
      points(dataset1[, 1:2],col = 'grey40', pch = 20)
      points(outOfSamplePoints[,1:2], pch = 5)
-     legend("bottomright", legend = c("in sample", "out of sample"), pch = c(20, 5), col = c('grey40', 'black'))
+     #legend("bottomright", legend = c("in sample", "out of sample"), pch = c(20, 5), col = c('grey40', 'black'))
      
      # define color pallette for lines
      cols = viridis::inferno(n  = length(breakpoints) + 1, end = 0.8)
@@ -268,6 +269,10 @@ diffs <- t(apply(sixbp, MARGIN = 1, function(x) diff(as.numeric(x))))
 discardfbp <- apply(diffs, MARGIN = 1, function(x) 1 %in% x)
 sixbp <- sixbp[!discardfbp, ]
 
+
+## seven bp's
+# can't do right now, because I cant' figure out how to use less memory
+
 #############################################################################
 # LOOK AT ALL INSTANCES OF A SINGLE BREAKPOINT
 #############################################################################
@@ -408,7 +413,7 @@ for(kk in 1:nrow(fivebp)){
 erDF5 <- as.data.frame(apply(erDF5, 2, unlist))
 colnames(erDF5) <- c("breakpt1", "breakpt2", "breakpt3", "breakpt4" , "bp5","meanAbsErr")
 erDF5 <- data.frame(erDF5)
-na.omit(erDF5[erDF5$meanAbsErr == min(erDF5$meanAbsErr, na.rm = TRUE),]) # 5  ,11 , 13,17,20
+na.omit(erDF5[erDF5$meanAbsErr == min(erDF5$meanAbsErr, na.rm = TRUE),]) # 5  ,11 , 13,17,20, err = 0.1727
 
 RegressionWBreaks(breakpoints = c(5  ,11 , 13,17,20), animal = alligator, cvGp = 1)
 
@@ -431,14 +436,12 @@ for(kk in 1:nrow(sixbp)){
 erDF6 <- as.data.frame(apply(erDF6, 2, unlist))
 colnames(erDF6) <- c("breakpt1", "breakpt2", "breakpt3", "breakpt4" , "bp5", "bp6","meanAbsErr")
 erDF6 <- data.frame(erDF6)
-na.omit(erDF6[erDF6$meanAbsErr == min(erDF6$meanAbsErr, na.rm = TRUE),]) # 3,7,11,13,17,20   error= 0.1899
+erDF6_1 <- erDF6[erDF6$breakpt1 != 1, ]
+na.omit(erDF6_1[erDF6_1$meanAbsErr == min(erDF6_1$meanAbsErr, na.rm = TRUE),]) # 3,7,11,13,17,20   error= 0.1899
+# 1,5,11,13,17,20 , err = 0.169
+# 3, 5,11,13,17,20 , err =     0.1719
 
-RegressionWBreaks(breakpoints = c(3,7,11,13,17,20), animal = alligator, cvGp = 1)
-
-
-
-
-
+RegressionWBreaks(breakpoints = c(3, 5,11,13,17,20), animal = alligator, cvGp = 1)
 
 
 
@@ -451,28 +454,38 @@ RegressionWBreaks(breakpoints = c(3,7,11,13,17,20), animal = alligator, cvGp = 1
 
 
 
-err3 <- numeric()
-### Test AREA
-alligator[, "cvGroup"] <- sample(alligator[, "cvGroup"]) # reshuffle cvGroup
-cvError <- numeric()
-for(ii in 1:10){
-     # png(paste("~/Desktop/testStack/", formatC(as.numeric(paste0(1, kk, ii)), width = 5, flag = 0), 
-     # ".png", sep = ""))
-     aa <- RegressionWBreaks(breakpoints = c(5  ,11), animal = alligator, cvGp = ii)
-     # dev.off()
-     if(!is.na(aa[1])) cvError[ii] <- aa$mean_abs_err
-     else cvError[ii] <- NA
+
+# here are the breaks, from the stuff suggested above
+one <- 5
+two <- c(5,11)
+three <- c(5, 11, 13)
+four <- c(5,10,17,20)
+five <- c(5  ,11 , 13,17,20)
+six <- c(3, 5,11,13,17,20)
+
+for(hh in list(one, two, three, four, five, six)){
+     err <- numeric()
+     for(ll in 1:30){
+          
+          alligator[, "cvGroup"] <- sample(alligator[, "cvGroup"]) # reshuffle cvGroup
+          cvError <- numeric()
+          for(ii in 1:10){
+               # png(paste("~/Desktop/testStack/", formatC(as.numeric(paste0(1, kk, ii)), width = 5, flag = 0), 
+               # ".png", sep = ""))
+               aa <- RegressionWBreaks(breakpoints = hh, animal = alligator, cvGp = ii)
+               # dev.off()
+               if(!is.na(aa[1])) cvError[ii] <- aa$mean_abs_err
+               else cvError[ii] <- NA
+          }  
+          err = c(err, round(mean(cvError, na.rm = TRUE), 4))
+            
+     }
+     print(paste(paste(hh, collapse = "_"), mean(err)))
+     
 }
 
-err3 = c(err3, round(mean(cvError, na.rm = TRUE), 4))
-plot(err3)
-abline(h = mean(err3))
 
-mean(err3)
-mean(err4)
-mean(err5)
-mean(err6)
 
-alligator[, "cvGroup"] <- sample(alligator[, "cvGroup"]) # reshuffle cvGroup
-RegressionWBreaks(breakpoints = c(5 ,10,20), animal = alligator, cvGp = 5)
-
+# best one so far:
+RegressionWBreaks(breakpoints = c(5, 11, 13, 17, 20), animal = alligator, cvGp =99)
+mtext("alligator vert regions with 10-fold CV")
