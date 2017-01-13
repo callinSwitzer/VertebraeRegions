@@ -3,6 +3,10 @@
 ## Update 12 Jan
 ## Vertebrae regions, using linear splines
 
+
+#############################################################################
+#setup
+#############################################################################
 #install packages
 ipak <- function(pkg){
      new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
@@ -18,8 +22,9 @@ ipak(packages)
 load("/Users/callinswitzer/Dropbox/dataAnalysisForOthers/VertebrateMorphology_Katrina/alligator.rda")
 load("/Users/callinswitzer/Dropbox/dataAnalysisForOthers/VertebrateMorphology_Katrina/mus.rda")
 
-
+#############################################################################
 # initial data inspection
+#############################################################################
 alli <- as.data.frame(mus)
 
 
@@ -52,8 +57,9 @@ colnames(mus)[ncol(mus)] <- "cvGroup"
 # alligator[, "cvGroup"] <- sample(alligator[, "cvGroup"]) # reshuffle cvGroup
 
 
-
+#############################################################################
 # function for conducting regression with different breakpoints
+#############################################################################
 RegressionWBreaks <- function(breakpoints = c(6, 15), animal = alligator, cvGp = 1){
      # compute pca
      pcs <- prcomp(animal[, 2:ncol(animal)], center = TRUE, scale. = TRUE)
@@ -123,8 +129,9 @@ RegressionWBreaks <- function(breakpoints = c(6, 15), animal = alligator, cvGp =
 }
 
 
-
+#############################################################################
 # function for conducting regression with different breakpoints, without plotting
+#############################################################################
 RegressionWBreaks_noPlot <- function(breakpoints = c(6, 15), animal = alligator, cvGp = 1){
      # compute pca
      pcs <- prcomp(animal[, 2:ncol(animal)], center = TRUE, scale. = TRUE)
@@ -199,8 +206,12 @@ RegressionWBreaks_noPlot <- function(breakpoints = c(6, 15), animal = alligator,
 RegressionWBreaks(breakpoints = c(2,3,4), animal = alligator, cvGp = 4)
 RegressionWBreaks_noPlot(breakpoints = c(2,7,14), animal = alligator, cvGp = 4)
 
+##################################################################
+# generate all possible combinations of one, two, three, or four breakpoints
+# but exclude models that have a single vertebra as a "section"
+# I can't think of a good way to use CV with a single vertebra
+##################################################################
 
-# generate all possible combinations of one two three breakpoints
 animal = alligator
 Onebp <- 1:(nrow(animal) - 1)
 twobp <- data.frame(bp1 = rep(1:length(animal), each = nrow(animal)), bp2 = 1:nrow(animal))
@@ -221,10 +232,46 @@ fourbp <- data.frame(bp1 = rep(1:nrow(animal), each = nrow(animal)^3),
                       bp3 = rep(1:nrow(animal), each = nrow(animal)), 
                       bp4 = 1:nrow(animal))
 fourbp <- fourbp[fourbp[,1] < fourbp[, 2] & fourbp[,2] < fourbp[,3] &  fourbp[,3] < fourbp[,4], ]
+# remove single vertebra groups
+diffs <- t(apply(fourbp, MARGIN = 1, function(x) diff(as.numeric(x))))
+discardfbp <- apply(diffs, MARGIN = 1, function(x) 1 %in% x)
+fourbp <- fourbp[!discardfbp, ]
 
 
 
+fivebp <- data.frame(bp1 = rep(1:nrow(animal), each = nrow(animal)^4), 
+                     bp2 = rep(1:nrow(animal), each = nrow(animal)^3), 
+                     bp3 = rep(1:nrow(animal), each = nrow(animal)^2), 
+                     bp4 = rep(1:nrow(animal), each = nrow(animal)),
+                     bp5 = 1:nrow(animal))
+fivebp <- fivebp[fivebp[,1] < fivebp[, 2] & fivebp[,2] < fivebp[,3] &  
+                      fivebp[,3] < fivebp[,4] &  fivebp[,4] < fivebp[,5], ]
+
+
+# remove single vertebra groups
+diffs <- t(apply(fivebp, MARGIN = 1, function(x) diff(as.numeric(x))))
+discardfbp <- apply(diffs, MARGIN = 1, function(x) 1 %in% x)
+fivebp <- fivebp[!discardfbp, ]
+
+
+## six bp's
+sixbp <- data.frame(bp1 = rep(1:nrow(animal), each = nrow(animal)^5), 
+                     bp2 = rep(1:nrow(animal), each = nrow(animal)^4), 
+                     bp3 = rep(1:nrow(animal), each = nrow(animal)^3), 
+                     bp4 = rep(1:nrow(animal), each = nrow(animal)^2),
+                     bp5 = rep(1:nrow(animal), each = nrow(animal)),
+                     bp6 = 1:nrow(animal))
+sixbp <- sixbp[sixbp[,1] < sixbp[, 2] & sixbp[,2] < sixbp[,3] &  
+                    sixbp[,3] < sixbp[,4] &  sixbp[,4] < sixbp[,5] &
+                sixbp[,5] < sixbp[,6], ]
+# remove single vertebra groups
+diffs <- t(apply(sixbp, MARGIN = 1, function(x) diff(as.numeric(x))))
+discardfbp <- apply(diffs, MARGIN = 1, function(x) 1 %in% x)
+sixbp <- sixbp[!discardfbp, ]
+
+#############################################################################
 # LOOK AT ALL INSTANCES OF A SINGLE BREAKPOINT
+#############################################################################
 erDF <- data.frame()
 for(kk in 1:length(Onebp)){
      cvError <- numeric()
@@ -245,8 +292,9 @@ erDF
 # visualize mean absolute error
 plot(erDF)
 
-
+#############################################################################
 ## DO THE SAME FOR ALL INSTANCES OF TWO BREAKPOINTS
+#############################################################################
 erDF2 <- matrix(ncol = 3, nrow = 0)
 for(kk in 1:nrow(twobp)){
      cvError <- numeric()
@@ -260,6 +308,7 @@ for(kk in 1:nrow(twobp)){
      }
      
      erDF2 <- rbind(erDF2, c( twobp[kk,], round(mean(cvError, na.rm = TRUE), 4)))
+     print(kk)
 }
 colnames(erDF2) <- c("breakpt1", "breakpt2","meanAbsErr")
 erDF2 <- data.frame(erDF2)
@@ -282,8 +331,9 @@ erDF[erDF$meanAbsErr == min(erDF$meanAbsErr),]
 erDF2 <- as.data.frame(apply(erDF2, 2, unlist)) # break at 10, error = 0.5402
 erDF2[erDF2$meanAbsErr == min(erDF2$meanAbsErr),] # breaks at 5 and 11, error = 0.2154
 
-
+#############################################################################
 ## DO THE SAME FOR ALL INSTANCES OF THREE BREAKPOINTS
+#############################################################################
 erDF3 <- matrix(ncol = 4, nrow = 0)
 for(kk in 1:nrow(threebp)){
      cvError <- numeric()
@@ -305,8 +355,9 @@ erDF3 <- data.frame(erDF3)
 na.omit(erDF3[erDF3$meanAbsErr == min(erDF3$meanAbsErr, na.rm = TRUE),]) # 5, 10, and 20, error = 0.1795
 
 
-
+#############################################################################
 ## DO THE SAME FOR ALL INSTANCES OF FOUR BREAKPOINTS
+#############################################################################
 erDF4 <- matrix(ncol = 5, nrow = 0)
 for(kk in 1:nrow(fourbp)){
      cvError <- numeric()
@@ -325,9 +376,101 @@ for(kk in 1:nrow(fourbp)){
 erDF4 <- as.data.frame(apply(erDF4, 2, unlist))
 colnames(erDF4) <- c("breakpt1", "breakpt2", "breakpt3", "breakpt4","meanAbsErr")
 erDF4 <- data.frame(erDF4)
-na.omit(erDF4[erDF4$meanAbsErr == min(erDF4$meanAbsErr, na.rm = TRUE),]) # 5, 10, 12, 13, mean Abs Err = 0.1558
-RegressionWBreaks(breakpoints = c(5, 10, 12, 13), animal = alligator, cvGp = 1)
+na.omit(erDF4[erDF4$meanAbsErr == min(erDF4$meanAbsErr, na.rm = TRUE),]) # 5, 11, 13, 20, mean Abs Err = 0.1768
+RegressionWBreaks(breakpoints = c(5, 11, 13, 20), animal = alligator, cvGp = 1)
 
-#HERE: should I have 1-vertebra segments?
+
+
+
+#############################################################################
+## DO THE SAME FOR ALL INSTANCES OF FIVE BREAKPOINTS, excluding single vert groups
+#############################################################################
+erDF5 <- matrix(ncol = 6, nrow = 0)
+for(kk in 1:nrow(fivebp)){
+     cvError <- numeric()
+     for(ii in 1:10){
+          # png(paste("~/Desktop/testStack/", formatC(as.numeric(paste0(1, kk, ii)), width = 5, flag = 0), 
+          # ".png", sep = ""))
+          aa <- RegressionWBreaks_noPlot(breakpoints = as.numeric(fivebp[kk,]), animal = alligator, cvGp = ii)
+          # dev.off()
+          if(!is.na(aa[1])) cvError[ii] <- aa$mean_abs_err
+          else cvError[ii] <- NA
+     }
+     
+     erDF5 <- rbind(erDF5, c( fivebp[kk,], round(mean(cvError, na.rm = TRUE), 4)))
+     print(paste(kk, "of", nrow(fivebp)))
+}
+erDF5 <- as.data.frame(apply(erDF5, 2, unlist))
+colnames(erDF5) <- c("breakpt1", "breakpt2", "breakpt3", "breakpt4" , "bp5","meanAbsErr")
+erDF5 <- data.frame(erDF5)
+na.omit(erDF5[erDF5$meanAbsErr == min(erDF5$meanAbsErr, na.rm = TRUE),]) # 5  ,11 , 13,17,20, mean Abs Err = 0.1752
+# this is the answer for groups that can have one vertebrae
+# here's what you get if you allow single breaks 5  ,      6  ,     10   ,    12 , 13 , 0.1333
+
+RegressionWBreaks(breakpoints = c(5  ,11 , 13,17,20), animal = alligator, cvGp = 1)
+
+#############################################################################
+## DO THE SAME FOR ALL INSTANCES OF SIX BREAKPOINTS, excluding single vert groups
+#############################################################################
+erDF6 <- matrix(ncol = 7, nrow = 0)
+for(kk in 1:nrow(fivebp)){
+     cvError <- numeric()
+     for(ii in 1:10){
+          # png(paste("~/Desktop/testStack/", formatC(as.numeric(paste0(1, kk, ii)), width = 5, flag = 0), 
+          # ".png", sep = ""))
+          aa <- RegressionWBreaks_noPlot(breakpoints = as.numeric(sixbp[kk,]), animal = alligator, cvGp = ii)
+          # dev.off()
+          if(!is.na(aa[1])) cvError[ii] <- aa$mean_abs_err
+          else cvError[ii] <- NA
+     }
+     
+     erDF6 <- rbind(erDF6, c( fivebp[kk,], round(mean(cvError, na.rm = TRUE), 4)))
+     print(paste(kk, "of", nrow(fivebp)))
+}
+erDF6 <- as.data.frame(apply(erDF6, 2, unlist))
+colnames(erDF6) <- c("breakpt1", "breakpt2", "breakpt3", "breakpt4" , "bp5", "bp6","meanAbsErr")
+erDF6 <- data.frame(erDF6)
+na.omit(erDF6[erDF6$meanAbsErr == min(erDF6$meanAbsErr, na.rm = TRUE),])
+
+RegressionWBreaks(breakpoints = c(5  ,11 , 13,17,20), animal = alligator, cvGp = 1)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+err4 <- numeric()
+### Test AREA
+alligator[, "cvGroup"] <- sample(alligator[, "cvGroup"]) # reshuffle cvGroup
+cvError <- numeric()
+for(ii in 1:10){
+     # png(paste("~/Desktop/testStack/", formatC(as.numeric(paste0(1, kk, ii)), width = 5, flag = 0), 
+     # ".png", sep = ""))
+     aa <- RegressionWBreaks(breakpoints = c(5  ,11), animal = alligator, cvGp = ii)
+     # dev.off()
+     if(!is.na(aa[1])) cvError[ii] <- aa$mean_abs_err
+     else cvError[ii] <- NA
+}
+
+err4 = c(err4, round(mean(cvError, na.rm = TRUE), 4))
+plot(err4)
+abline(h = mean(err4))
+
+mean(err4)
+mean(err5)
+mean(err6)
+
+ii = 2
 
 
